@@ -23,15 +23,6 @@
 - [ ] Query historical data efficiently
 - [ ] Cache recent/current market data
 
-## Events
-- [ ] `TickReceived`
-- [ ] `CandleUpdated`
-- [ ] `CandleClosed`
-- [ ] `MarketOpened`
-- [ ] `MarketClosed`
-- [ ] `DataGapDetected`
-- [ ] `FeedDisconnected`
-
 ## Backtesting
 - [ ] Historical data replay
 - [ ] Live/backtest compatible interface
@@ -45,6 +36,7 @@
 - [ ] Subscribe to market events
 - [ ] Get instrument information
 - [ ] Get data/feed status
+- [ ] Get open/historic positions
 
 ## Monitoring
 - [ ] Track feed connection
