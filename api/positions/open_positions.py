@@ -1,9 +1,24 @@
-import pandas as pd
-import os
-from pathlib import Path
+import MetaTrader5 as mt5
+
+def _format_positions(positions):
+    result = []
+
+    if positions is None:
+        return result
+
+    for position in positions:
+        result.append({
+            "price_open": position.price_open,
+            "sl": position.sl,
+            "tp": position.tp,
+            "symbol": position.symbol,
+            "profit": position.profit,
+        })
+
+    return result
 
 
 def get_open_positions():
-    df = pd.read_csv(Path(os.getenv("BASE_DIR")) / "data/open_positions.csv")
+    open_positions = mt5.positions_get()
 
-    return df["ticket"].tolist()
+    return _format_positions(open_positions)
