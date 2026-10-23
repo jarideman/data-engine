@@ -8,11 +8,25 @@ def _format_positions(positions):
         return result
 
     for position in positions:
+        order_type = "buy" if position.type == mt5.POSITION_TYPE_BUY else "sell"
+
+        open_time = datetime.fromtimestamp(
+            position.time, tz=timezone.utc
+        )
+        date = open_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        # TODO: Fill remaining data
         result.append({
-            "price_open": position.price,
-            "lot_size": position.volume,
-            "profit": position.profit,
-            "symbol": position.symbol
+            "symbol": position.symbol,
+            "status": 'closed',
+            "type": order_type,
+            'volume': position.volume,
+            'price_open': position.price,
+            'price_exit': '',
+            'stop_loss': '',
+            'take_profit': '',
+            'profit': position.profit,
+            'date': date, 
         })
 
     return result
@@ -32,7 +46,7 @@ def get_closed_positions():
     from_date = datetime(2024, 1, 1)
     to_date = server_time
 
-    #deze kunnen wel gewoon offline?   + optie tot force sync / check metatraerd webhooks
+    # TODO: Check if this can be cached
     history_deals = mt5.history_deals_get(from_date, to_date)
 
     if history_deals is None:
@@ -45,5 +59,7 @@ def get_closed_positions():
             mt5.DEAL_ENTRY_OUT_BY,
             mt5.DEAL_ENTRY_INOUT]
     ]
+
+    print(closed_position)
 
     return _format_positions(closed_position)

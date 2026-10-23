@@ -5,11 +5,11 @@ from positions.closed_positions import get_closed_positions
 router = APIRouter()
 
 
-@router.get("/api/postions/open")
+@router.get("/api/positions/open")
 def open_positions():
     return get_open_positions()
 
 
-@router.get("/api/postions/closed")
+@router.get("/api/positions/closed")
 def closed_positions():
     return get_closed_positions()

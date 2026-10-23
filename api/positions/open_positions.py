@@ -1,4 +1,6 @@
 import MetaTrader5 as mt5
+from datetime import datetime, timezone
+
 
 def _format_positions(positions):
     result = []
@@ -7,12 +9,24 @@ def _format_positions(positions):
         return result
 
     for position in positions:
+        order_type = "buy" if position.type == mt5.POSITION_TYPE_BUY else "sell"
+
+        open_time = datetime.fromtimestamp(
+            position.time, tz=timezone.utc
+        )
+        date = open_time.strftime("%Y-%m-%d %H:%M:%S")
+
         result.append({
-            "price_open": position.price_open,
-            "sl": position.sl,
-            "tp": position.tp,
             "symbol": position.symbol,
-            "profit": position.profit,
+            "status": 'open',
+            "type": order_type,
+            'volume': position.volume,
+            'price_open': position.price_open,
+            'price_current': position.price_current,
+            'stop_loss': position.sl,
+            'take_profit': position.tp,
+            'profit': position.profit,
+            'date': date,
         })
 
     return result
