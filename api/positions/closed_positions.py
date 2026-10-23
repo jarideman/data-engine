@@ -52,14 +52,11 @@ def get_closed_positions():
     if history_deals is None:
         return []
 
-    # Keep only completed historical orders
     closed_position = [
         order for order in history_deals
         if order.entry in [mt5.DEAL_ENTRY_OUT,
             mt5.DEAL_ENTRY_OUT_BY,
             mt5.DEAL_ENTRY_INOUT]
     ]
-
-    print(closed_position)
 
     return _format_positions(closed_position)
