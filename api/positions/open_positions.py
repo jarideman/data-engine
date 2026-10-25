@@ -25,7 +25,7 @@ def _format_positions(positions):
             'price_current': position.price_current,
             'stop_loss': position.sl,
             'take_profit': position.tp,
-            'profit': position.profit,
+            'profit': position.profit + position.swap,
             'date': date,
         })
 
