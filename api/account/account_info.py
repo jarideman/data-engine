@@ -6,6 +6,7 @@ def _format_account_info(account_info):
         'name': account_info.name,
         'leverage': account_info.leverage,
         'balance': account_info.balance,
+        'equity': account_info.equity,
         'profit': account_info.profit,
         'server': account_info.server,
         'trade_allowed': account_info.trade_allowed,

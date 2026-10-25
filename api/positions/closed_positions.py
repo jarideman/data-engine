@@ -25,7 +25,7 @@ def _format_positions(positions):
             'price_exit': '',
             'stop_loss': '',
             'take_profit': '',
-            'profit': position.profit,
+            'profit': position.profit + position.swap,
             'date': date, 
         })
 
@@ -39,11 +39,12 @@ def get_closed_positions():
 
     if tick is not None:
         server_time = datetime.fromtimestamp(
-            tick.time,
-            tz=timezone.utc
+            tick.time
         )
     
     from_date = datetime(2024, 1, 1)
+
+    # LIjkt nog niet helemaal lekker te gaan
     to_date = server_time
 
     # TODO: Check if this can be cached
