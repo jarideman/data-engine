@@ -2,7 +2,7 @@ import MetaTrader5 as mt5
 from datetime import datetime, timezone
 from collections import defaultdict
 
-
+# Check/reformat this code
 def _format_positions(deals):
     result = []
 
