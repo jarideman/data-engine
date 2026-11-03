@@ -1,33 +1,69 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timezone
+from collections import defaultdict
 
-def _format_positions(positions):
+# Check/reformat this code
+def _format_positions(deals):
     result = []
 
-    if positions is None:
+    if not deals:
         return result
 
-    for position in positions:
-        order_type = "buy" if position.type == mt5.POSITION_TYPE_BUY else "sell"
+    positions = defaultdict(list)
 
-        open_time = datetime.fromtimestamp(
-            position.time, tz=timezone.utc
-        )
-        date = open_time.strftime("%Y-%m-%d %H:%M:%S")
+    for deal in deals:
+        positions[deal.position_id].append(deal)
 
-        # TODO: Fill remaining data
-        result.append({
-            "symbol": position.symbol,
-            "status": 'closed',
-            "type": order_type,
-            'volume': position.volume,
-            'price_open': position.price,
-            'price_exit': '',
-            'stop_loss': '',
-            'take_profit': '',
-            'profit': position.profit,
-            'date': date, 
-        })
+    for position_id, position_deals in positions.items():
+        opening_deals = [
+            d for d in position_deals
+            if d.entry == mt5.DEAL_ENTRY_IN
+        ]
+
+        closing_deals = [
+            d for d in position_deals
+            if d.entry in (
+                mt5.DEAL_ENTRY_OUT,
+                mt5.DEAL_ENTRY_OUT_BY,
+                mt5.DEAL_ENTRY_INOUT
+            )
+        ]
+
+        if not closing_deals:
+            continue
+
+        total_open_volume = sum(d.volume for d in opening_deals)
+
+        if total_open_volume:
+            price_open = sum(
+                d.price * d.volume for d in opening_deals
+            ) / total_open_volume
+        else:
+            price_open = None
+
+        for deal in closing_deals:
+            order_type = (
+                "buy"
+                if deal.type == mt5.DEAL_TYPE_SELL
+                else "sell"
+            )
+
+            close_time = datetime.fromtimestamp(
+                deal.time,
+                tz=timezone.utc
+            )
+
+            result.append({
+                "symbol": deal.symbol,
+                "position_id": position_id,
+                "status": "closed",
+                "type": order_type,
+                "volume": deal.volume,
+                "price_open": price_open,
+                "price_exit": deal.price,
+                "profit": deal.profit + deal.swap + deal.commission,
+                "date": close_time.strftime("%Y-%m-%d %H:%M:%S"),
+            })
 
     return result
 
@@ -37,26 +73,19 @@ def get_closed_positions():
 
     tick = mt5.symbol_info_tick(symbol)
 
-    if tick is not None:
-        server_time = datetime.fromtimestamp(
-            tick.time,
-            tz=timezone.utc
+    if tick is None:
+        raise RuntimeError(
+            f"Cannot retrieve tick for {symbol}: {mt5.last_error()}"
         )
-    
-    from_date = datetime(2024, 1, 1)
-    to_date = server_time
 
-    # TODO: Check if this can be cached
+    from_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    to_date = datetime.fromtimestamp(tick.time, tz=timezone.utc)
+
     history_deals = mt5.history_deals_get(from_date, to_date)
 
     if history_deals is None:
-        return []
+        raise RuntimeError(
+            f"Cannot retrieve history: {mt5.last_error()}"
+        )
 
-    closed_position = [
-        order for order in history_deals
-        if order.entry in [mt5.DEAL_ENTRY_OUT,
-            mt5.DEAL_ENTRY_OUT_BY,
-            mt5.DEAL_ENTRY_INOUT]
-    ]
-
-    return _format_positions(closed_position)
+    return _format_positions(history_deals)
