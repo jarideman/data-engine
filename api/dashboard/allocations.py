@@ -66,51 +66,23 @@ def get_trading_data():
         total_exposure = 0
 
         for symbol, item in grouped.items():
-
             total_exposure += item["value"]
 
             allocation.append({
-                "symbol": symbol,
-                "value": round(item["value"], 2),
-                "percentage": round(
+                "name": symbol,
+                "value": round(
                     item["value"] / balance * 100 if balance else 0, 2
                 ),
-                "volume": round(item["volume"], 8),
-                "profit": round(item["profit"], 2),
-                "margin": round(item["margin"], 2),
-                "positions_count": item["positions_count"]
             })
 
         # Cash as remaining nominal balance
         cash = max(0, balance - total_exposure)
 
         allocation.append({
-            "symbol": "Cash",
-            "value": round(cash, 2),
-            "percentage": round(
+            "name": "Cash",
+            "value": round(
                 cash / balance * 100 if balance else 0, 2
             ),
-            "volume": 0,
-            "profit": 0,
-            "margin": 0,
-            "positions_count": 0
         })
 
-        return {
-            "balance": balance,
-            "equity": equity,
-            "profit": account.profit,
-
-            "allocation": allocation,
-
-            "margin": {
-                "used": account.margin,
-                "free": account.margin_free,
-                "used_percentage": round(
-                    account.margin / equity * 100 if equity else 0, 2
-                ),
-                "free_percentage": round(
-                    account.margin_free / equity * 100 if equity else 0, 2
-                )
-            }
-        }
+        return allocation
