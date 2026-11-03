@@ -2,8 +2,14 @@ from fastapi import APIRouter
 from positions.open_positions import get_open_positions
 from positions.closed_positions import get_closed_positions
 from account.account_info import get_account_info
+from dashboard.allocations import get_trading_data
 
 router = APIRouter()
+
+
+@router.get("/api/dashboard/allocations")
+def allocations():
+    return get_trading_data()
 
 
 @router.get("/api/positions/open")
@@ -19,3 +25,4 @@ def closed_positions():
 @router.get("/api/account")
 def account_info():
     return get_account_info()
+
