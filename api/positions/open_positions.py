@@ -17,6 +17,7 @@ def _format_positions(positions):
         date = open_time.strftime("%Y-%m-%d %H:%M:%S")
 
         result.append({
+            "ticket": position.ticket,
             "symbol": position.symbol,
             "status": 'open',
             "type": order_type,
@@ -25,7 +26,7 @@ def _format_positions(positions):
             'price_current': position.price_current,
             'stop_loss': position.sl,
             'take_profit': position.tp,
-            'profit': position.profit + position.swap + position.commission,
+            'profit': position.profit + position.swap,
             'date': date,
         })
 

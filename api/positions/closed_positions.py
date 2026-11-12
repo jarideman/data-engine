@@ -54,6 +54,7 @@ def _format_positions(deals):
             )
 
             result.append({
+                "ticket": deal.ticket,
                 "symbol": deal.symbol,
                 "position_id": position_id,
                 "status": "closed",
