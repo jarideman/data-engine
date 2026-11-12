@@ -17,6 +17,7 @@ def _format_positions(positions):
         date = open_time.strftime("%Y-%m-%d %H:%M:%S")
 
         result.append({
+            "ticket": position.ticket,
             "symbol": position.symbol,
             "status": 'open',
             "type": order_type,

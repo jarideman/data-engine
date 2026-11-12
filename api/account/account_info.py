@@ -68,3 +68,33 @@ def get_risk_details():
       "value": 0,
     },
   ]
+
+
+def get_performance_data():
+  return [
+    {
+      "date": "Mar 22",
+      "Balance": 1050,
+      "P&L": 50,
+    },
+    {
+      "date": "Mar 23",
+      "Balance": 1095,
+      "P&L": 95,
+    },
+    {
+      "date": "Mar 24",
+      "Balance": 1025,
+      "P&L": 25,
+    },
+    {
+      "date": "Mar 25",
+      "Balance": 1035,
+      "P&L": 35,
+    },
+    {
+      "date": "Mar 26",
+      "Balance": 1060,
+      "P&L": 60,
+    },
+  ];
