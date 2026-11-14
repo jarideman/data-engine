@@ -90,3 +90,43 @@ def get_closed_positions():
         )
 
     return _format_positions(history_deals)
+
+
+def get_closed_position(ticket: int):
+    deals = mt5.history_deals_get(ticket=ticket)
+
+    if deals is None or len(deals) == 0:
+        return None
+
+    deal = deals[0]
+
+    orders = mt5.history_orders_get(ticket=deal.order)
+
+    if orders is None or len(orders) == 0:
+        return None
+
+    order = orders[0]
+
+    order_type = (
+        "buy"
+        if deal.type == mt5.DEAL_TYPE_SELL
+        else "sell"
+    )
+
+    close_time = datetime.fromtimestamp(
+        deal.time,
+        tz=timezone.utc
+    )
+
+    return ({
+        "ticket": deal.ticket,
+        "symbol": deal.symbol,
+        "position_id": deal.position_id,
+        "status": "closed",
+        "type": order_type,
+        "volume": deal.volume,
+        "price_open": order.price_open,
+        "price_exit": deal.price,
+        "profit": deal.profit + deal.swap + deal.commission,
+        "date": close_time.strftime("%Y-%m-%d %H:%M:%S"),
+    })

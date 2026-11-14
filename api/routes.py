@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from positions.open_positions import get_open_positions
-from positions.closed_positions import get_closed_positions
+from positions.open_positions import get_open_positions, get_open_position
+from positions.closed_positions import get_closed_positions, get_closed_position
 from account.account_info import get_account_info, get_portfolio_details, get_risk_details, get_performance_data
 from dashboard.allocations import get_trading_data
 
@@ -12,9 +12,19 @@ def open_positions():
     return get_open_positions()
 
 
+@router.get("/api/positions/open/{ticket}")
+def open_positions(ticket: int):
+    return get_open_position(ticket=ticket)
+
+
 @router.get("/api/positions/closed")
 def closed_positions():
     return get_closed_positions()
+
+
+@router.get("/api/positions/closed/{ticket}")
+def closed_position(ticket: int):
+    return get_closed_position(ticket=ticket)
 
 
 @router.get("/api/account/info")
