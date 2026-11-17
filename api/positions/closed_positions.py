@@ -82,6 +82,8 @@ def get_closed_positions():
     from_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
     to_date = datetime.fromtimestamp(tick.time, tz=timezone.utc)
 
+
+    # TODO: Ombouwen naar positions
     history_deals = mt5.history_deals_get(from_date, to_date)
 
     if history_deals is None:
