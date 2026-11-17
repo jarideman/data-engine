@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from account.account_info import get_account_info, get_portfolio_details, get_risk_details, get_performance_data
 from dashboard.allocations import get_trading_data
 
@@ -25,8 +25,13 @@ def risk_details():
 
 
 @router.get("/performance")
-def performance_data():
-    return get_performance_data()
+def performance_data(
+    filter: str = Query(
+        default="ALL",
+        pattern="^(1D|1W|1M|3M|6M|YTD|1Y|ALL)$"
+    )
+):
+    return get_performance_data(filter)
 
 
 @router.get("/allocations")
