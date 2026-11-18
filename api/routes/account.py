@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Query
-from account.account_info import get_account_info, get_portfolio_details, get_risk_details, get_performance_data
-from dashboard.allocations import get_trading_data
+from account.account_info import get_account_info, get_portfolio_details, get_risk_details, get_performance_data, get_allocations
 
 
 router = APIRouter(
@@ -36,4 +35,4 @@ def performance_data(
 
 @router.get("/allocations")
 def allocations():
-    return get_trading_data()
+    return get_allocations()

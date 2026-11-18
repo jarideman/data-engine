@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 from symbol.symbol_data import get_symbol_data
 
+
 router = APIRouter(
     prefix="/symbols",
     tags=["Symbols"]
