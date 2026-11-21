@@ -2,7 +2,7 @@ import MetaTrader5 as mt5
 from datetime import datetime, timezone
 from collections import defaultdict
 
-# Check/reformat this code
+# Check/refactor this code
 def _format_positions(deals):
     result = []
 
@@ -70,65 +70,25 @@ def _format_positions(deals):
 
 
 def get_closed_positions():
-    symbol = "EURUSD"
-
-    tick = mt5.symbol_info_tick(symbol)
-
-    if tick is None:
-        raise RuntimeError(
-            f"Cannot retrieve tick for {symbol}: {mt5.last_error()}"
-        )
+    now = datetime.now(timezone.utc)
 
     from_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    to_date = datetime.fromtimestamp(tick.time, tz=timezone.utc)
-
+    to_date = datetime.fromtimestamp(now, tz=timezone.utc)
 
     # TODO: Ombouwen naar positions
     history_deals = mt5.history_deals_get(from_date, to_date)
 
     if history_deals is None:
-        raise RuntimeError(
-            f"Cannot retrieve history: {mt5.last_error()}"
-        )
+        return None
 
     return _format_positions(history_deals)
 
 
 def get_closed_position(ticket: int):
+    # TODO: Ombouwen naar positions
     deals = mt5.history_deals_get(ticket=ticket)
 
     if deals is None or len(deals) == 0:
         return None
 
-    deal = deals[0]
-
-    orders = mt5.history_orders_get(ticket=deal.order)
-
-    if orders is None or len(orders) == 0:
-        return None
-
-    order = orders[0]
-
-    order_type = (
-        "buy"
-        if deal.type == mt5.DEAL_TYPE_SELL
-        else "sell"
-    )
-
-    close_time = datetime.fromtimestamp(
-        deal.time,
-        tz=timezone.utc
-    )
-
-    return ({
-        "ticket": deal.ticket,
-        "symbol": deal.symbol,
-        "position_id": deal.position_id,
-        "status": "closed",
-        "type": order_type,
-        "volume": deal.volume,
-        "price_open": order.price_open,
-        "price_exit": deal.price,
-        "profit": deal.profit + deal.swap + deal.commission,
-        "date": close_time.strftime("%Y-%m-%d %H:%M:%S"),
-    })
+    return _format_positions(deals)[0]

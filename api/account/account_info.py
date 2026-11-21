@@ -32,95 +32,95 @@ def get_account_info():
 
 
 def get_portfolio_details():
-        account = _account_info()
+    account = _account_info()
 
-        deals = mt5.history_deals_get(
-            datetime(2000, 1, 1, tzinfo=timezone.utc),
-            datetime.now(timezone.utc)
-        )
+    deals = mt5.history_deals_get(
+        datetime(2000, 1, 1, tzinfo=timezone.utc),
+        datetime.now(timezone.utc)
+    )
 
-        deposits = 0.0
-        withdrawals = 0.0
+    deposits = 0.0
+    withdrawals = 0.0
 
-        if deals:
-            for deal in deals:
-                if deal.type == mt5.DEAL_TYPE_BALANCE:
-                    if deal.profit > 0:
-                        deposits += deal.profit
-                    elif deal.profit < 0:
-                        withdrawals += abs(deal.profit)
+    if deals:
+        for deal in deals:
+            if deal.type == mt5.DEAL_TYPE_BALANCE:
+                if deal.profit > 0:
+                    deposits += deal.profit
+                elif deal.profit < 0:
+                    withdrawals += abs(deal.profit)
 
-        net_deposits = deposits - withdrawals
+    net_deposits = deposits - withdrawals
 
-        balance = account.balance
-        equity = account.equity
-        floating_pnl = account.profit
+    balance = account.balance
+    equity = account.equity
+    floating_pnl = account.profit
 
-        # Realized P&L = balance minus net deposits
-        realized_pnl = balance - net_deposits
+    # Realized P&L = balance minus net deposits
+    realized_pnl = balance - net_deposits
 
-        # Total P&L = realized P&L + floating P&L
-        total_pnl = realized_pnl + floating_pnl
+    # Total P&L = realized P&L + floating P&L
+    total_pnl = realized_pnl + floating_pnl
 
-        # Total return percentage
-        total_return = (
-            (total_pnl / net_deposits) * 100
-            if net_deposits > 0
-            else 0.0
-        )
+    # Total return percentage
+    total_return = (
+        (total_pnl / net_deposits) * 100
+        if net_deposits > 0
+        else 0.0
+    )
 
-        today_start = datetime.combine(
-            datetime.now(timezone.utc).date(),
-            time.min,
-            tzinfo=timezone.utc
-        )
+    today_start = datetime.combine(
+        datetime.now(timezone.utc).date(),
+        time.min,
+        tzinfo=timezone.utc
+    )
 
-        today_deals = mt5.history_deals_get(
-            today_start,
-            datetime.now(timezone.utc)
-        )
+    today_deals = mt5.history_deals_get(
+        today_start,
+        datetime.now(timezone.utc)
+    )
 
-        today_profit = 0.0
+    today_profit = 0.0
 
-        if today_deals:
-            for deal in today_deals:
-                if deal.type in (
-                    mt5.DEAL_TYPE_BUY,
-                    mt5.DEAL_TYPE_SELL
-                ):
-                    today_profit += (
-                        deal.profit
-                        + deal.swap
-                        + deal.commission
-                        + deal.fee
-                    )
+    if today_deals:
+        for deal in today_deals:
+            if deal.type in (
+                mt5.DEAL_TYPE_BUY,
+                mt5.DEAL_TYPE_SELL
+            ):
+                today_profit += (
+                    deal.profit
+                    + deal.swap
+                    + deal.commission
+                    + deal.fee
+                )
 
-        return [
-            {
-                "label": "Total Portfolio Value",
-                "value": round(equity, 2)
-            },
-            {
-                "label": "Total P&L",
-                "value": round(total_pnl, 2)
-            },
-            {
-                "label": "Total Return (%)",
-                "value": f"{total_return:.2f} %"
-            },
-            {
-                "label": "Floating P&L",
-                "value": round(floating_pnl, 2)
-            },
-            {
-                "label": "Today's P&L",
-                "value": round(today_profit, 2)
-            },
-            {
-                "label": "Cash Balance",
-                "value": round(balance, 2)
-            }
-        ]
+    return [
+        {
+            "label": "Total Portfolio Value",
+            "value": round(equity, 2)
+        },
+        {
+            "label": "Total P&L",
+            "value": round(total_pnl, 2)
+        },
+        {
+            "label": "Total Return (%)",
+            "value": f"{total_return:.2f} %"
+        },
+        {
+            "label": "Floating P&L",
+            "value": round(floating_pnl, 2)
+        },
+        {
+            "label": "Today's P&L",
+            "value": round(today_profit, 2)
+        },
+        {
+            "label": "Cash Balance",
+            "value": round(balance, 2)
+        }
+    ]
 
 
 def get_risk_details():
@@ -391,7 +391,6 @@ def get_performance_data(time_filter="ALL"):
     total_historical_movements = 0.0
 
     for deal in deals:
-
         deal_date = datetime.fromtimestamp(
             deal.time,
             tz=timezone.utc
@@ -546,82 +545,81 @@ def get_performance_data(time_filter="ALL"):
 
 
 def get_allocations():
-        account = _account_info()
+    account = _account_info()
 
-        balance = account.balance
+    balance = account.balance
 
-        positions = mt5.positions_get()
+    positions = mt5.positions_get()
 
-        if positions is None:
-            raise Exception(f"Positions error: {mt5.last_error()}")
+    if positions is None:
+        raise Exception(f"Positions error: {mt5.last_error()}")
 
-        # Group positions by symbol
-        grouped = {}
+    # Group positions by symbol
+    grouped = {}
 
-        for pos in positions:
+    for pos in positions:
+        symbol = pos.symbol
+        symbol_info = mt5.symbol_info(symbol)
 
-            symbol = pos.symbol
-            symbol_info = mt5.symbol_info(symbol)
+        if symbol_info is None:
+            continue
 
-            if symbol_info is None:
-                continue
+        if symbol not in grouped:
+            grouped[symbol] = {
+                "symbol": symbol,
+                "value": 0,
+                "volume": 0,
+                "profit": 0,
+                "margin": 0,
+                "positions_count": 0
+            }
 
-            if symbol not in grouped:
-                grouped[symbol] = {
-                    "symbol": symbol,
-                    "value": 0,
-                    "volume": 0,
-                    "profit": 0,
-                    "margin": 0,
-                    "positions_count": 0
-                }
+        position_value = (
+            pos.volume *
+            symbol_info.trade_contract_size *
+            pos.price_current
+        )
 
-            position_value = (
-                pos.volume *
-                symbol_info.trade_contract_size *
-                pos.price_current
-            )
+        order_type = (
+            mt5.ORDER_TYPE_BUY
+            if pos.type == mt5.POSITION_TYPE_BUY
+            else mt5.ORDER_TYPE_SELL
+        )
 
-            order_type = (
-                mt5.ORDER_TYPE_BUY
-                if pos.type == mt5.POSITION_TYPE_BUY
-                else mt5.ORDER_TYPE_SELL
-            )
+        margin = mt5.order_calc_margin(
+            order_type,
+            symbol,
+            pos.volume,
+            pos.price_current
+        )
 
-            margin = mt5.order_calc_margin(
-                order_type,
-                symbol,
-                pos.volume,
-                pos.price_current
-            )
+        grouped[symbol]["value"] += position_value
+        grouped[symbol]["volume"] += pos.volume
+        grouped[symbol]["profit"] += pos.profit
+        grouped[symbol]["margin"] += margin or 0
+        grouped[symbol]["positions_count"] += 1
 
-            grouped[symbol]["value"] += position_value
-            grouped[symbol]["volume"] += pos.volume
-            grouped[symbol]["profit"] += pos.profit
-            grouped[symbol]["margin"] += margin or 0
-            grouped[symbol]["positions_count"] += 1
+    allocation = []
+    total_exposure = 0
 
-        allocation = []
-        total_exposure = 0
-
-        for symbol, item in grouped.items():
-            total_exposure += item["value"]
-
-            allocation.append({
-                "name": symbol,
-                "value": round(
-                    item["value"] / balance * 100 if balance else 0, 2
-                ),
-            })
-
-        # Cash as remaining nominal balance
-        cash = max(0, balance - total_exposure)
+    for symbol, item in grouped.items():
+        total_exposure += item["value"]
 
         allocation.append({
-            "name": "Cash",
+            "name": symbol,
             "value": round(
-                cash / balance * 100 if balance else 0, 2
+                item["value"] / balance * 100 if balance else 0, 2
             ),
         })
 
-        return allocation
+    # Cash as remaining nominal balance
+    cash = max(0, balance - total_exposure)
+
+    allocation.append({
+        "name": "Cash",
+        "value": round(
+            cash / balance * 100 if balance else 0, 2
+        ),
+    })
+
+    return allocation

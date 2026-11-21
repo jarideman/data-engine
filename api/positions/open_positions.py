@@ -45,26 +45,4 @@ def get_open_position(ticket: int):
     if positions is None or len(positions) == 0:
         return None
 
-    position = positions[0]
-
-    order_type = "buy" if position.type == mt5.POSITION_TYPE_BUY else "sell"
-
-    open_time = datetime.fromtimestamp(
-        position.time, tz=timezone.utc
-    )
-
-    date = open_time.strftime("%Y-%m-%d %H:%M:%S")
-
-    return {
-            "ticket": position.ticket,
-            "symbol": position.symbol,
-            "status": 'open',
-            "type": order_type,
-            'volume': position.volume,
-            'price_open': position.price_open,
-            'price_current': position.price_current,
-            'stop_loss': position.sl,
-            'take_profit': position.tp,
-            'profit': position.profit + position.swap,
-            'date': date,
-        }
+    return _format_positions(positions)[0]
