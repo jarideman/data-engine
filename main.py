@@ -1,5 +1,4 @@
 from connection import init_mt5, deinit_mt5
-from sync.run_sync import sync_account_data
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +15,6 @@ def main():
         return
 
     load_dotenv()
-    sync_account_data()
 
     process = subprocess.Popen(
         [

@@ -2,7 +2,7 @@ import MetaTrader5 as mt5
 from datetime import datetime, timezone
 from collections import defaultdict
 
-# Check/reformat this code
+# Check/refactor this code
 def _format_positions(deals):
     result = []
 
@@ -54,6 +54,7 @@ def _format_positions(deals):
             )
 
             result.append({
+                "ticket": deal.ticket,
                 "symbol": deal.symbol,
                 "position_id": position_id,
                 "status": "closed",
@@ -69,23 +70,25 @@ def _format_positions(deals):
 
 
 def get_closed_positions():
-    symbol = "EURUSD"
-
-    tick = mt5.symbol_info_tick(symbol)
-
-    if tick is None:
-        raise RuntimeError(
-            f"Cannot retrieve tick for {symbol}: {mt5.last_error()}"
-        )
+    now = datetime.now(timezone.utc)
 
     from_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    to_date = datetime.fromtimestamp(tick.time, tz=timezone.utc)
+    to_date = datetime.fromtimestamp(now, tz=timezone.utc)
 
+    # TODO: Ombouwen naar positions
     history_deals = mt5.history_deals_get(from_date, to_date)
 
     if history_deals is None:
-        raise RuntimeError(
-            f"Cannot retrieve history: {mt5.last_error()}"
-        )
+        return None
 
     return _format_positions(history_deals)
+
+
+def get_closed_position(ticket: int):
+    # TODO: Ombouwen naar positions
+    deals = mt5.history_deals_get(ticket=ticket)
+
+    if deals is None or len(deals) == 0:
+        return None
+
+    return _format_positions(deals)[0]
