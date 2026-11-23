@@ -1,2 +1,6 @@
 git+https://github.com/jarideman/mt5-connection.git
-MetaTrader5
+MetaTrader5>=5.0.45,<6
+pandas>=2.2,<3.1
+python-dotenv>=1.0,<2
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
