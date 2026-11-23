@@ -12,10 +12,6 @@ def get_symbol_data(symbol: str, time_filter="ALL"):
   if symbol_info is None:
     raise Exception(f"Symbol {symbol} not found")
 
-  if not symbol_info.visible:
-    if not mt5.symbol_select(symbol, True):
-      raise Exception(f"Unable to select symbol {symbol}")
-
   now = datetime.now(timezone.utc)
 
   rates = mt5.copy_rates_range(
