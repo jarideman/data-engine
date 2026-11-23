@@ -1,3 +1,10 @@
+# Setup
+
+Run `pip install -r requirements.txt`
+
+run `python main.py`
+
+
 ## Core
 - [x] Connect to MT5
 - [ ] Receive tick data
