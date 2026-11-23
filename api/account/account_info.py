@@ -10,7 +10,7 @@ def _account_info():
   if account is None:
     raise Exception(
       f"Unable to retrieve account information: {mt5.last_error()}"
-  )
+    )
 
   return account
 
@@ -357,11 +357,19 @@ def get_risk_details():
     ]
 
 
+# deze naar shared??
+def _get_deal_net_profit(deal):
+  return (
+    deal.profit
+    + deal.swap
+    + deal.commission
+    + getattr(deal, "fee", 0.0)
+  )
+
 def get_performance_data(time_filter="ALL"):
     account = _account_info()
 
     now = datetime.now(timezone.utc)
-
     start_date = get_filter_start_date(time_filter)
 
     deals = mt5.history_deals_get(
@@ -372,14 +380,6 @@ def get_performance_data(time_filter="ALL"):
     if deals is None:
         raise Exception(
             f"Unable to retrieve trading history: {mt5.last_error()}"
-        )
-
-    def get_deal_net_profit(deal):
-        return (
-            deal.profit
-            + deal.swap
-            + deal.commission
-            + getattr(deal, "fee", 0.0)
         )
 
 
@@ -400,8 +400,7 @@ def get_performance_data(time_filter="ALL"):
             mt5.DEAL_TYPE_BUY,
             mt5.DEAL_TYPE_SELL
         ):
-
-            net_profit = get_deal_net_profit(deal)
+            net_profit = _get_deal_net_profit(deal)
 
             total_historical_movements += net_profit
 
@@ -416,7 +415,6 @@ def get_performance_data(time_filter="ALL"):
             ))
 
         elif deal.type == mt5.DEAL_TYPE_BALANCE:
-
             amount = deal.profit
 
             total_historical_movements += amount
@@ -452,7 +450,6 @@ def get_performance_data(time_filter="ALL"):
         ).date()
 
     for timestamp, ticket, movement, deal_date, movement_type in all_movements:
-
         running_balance += movement
 
         if running_balance != 0 and first_active_date is None:
@@ -469,11 +466,9 @@ def get_performance_data(time_filter="ALL"):
 
     end_date = now.date()
 
-
     start_balance = initial_balance
 
     for timestamp, ticket, movement, deal_date, movement_type in all_movements:
-
         if deal_date < effective_start_date:
             start_balance += movement
 
@@ -496,7 +491,6 @@ def get_performance_data(time_filter="ALL"):
     current_date = effective_start_date
 
     while current_date <= end_date:
-
         trading_pnl = daily_trading.get(current_date, 0.0)
 
         cash_movement = daily_cash_movements.get(
@@ -528,7 +522,6 @@ def get_performance_data(time_filter="ALL"):
     )
 
     if performance_data:
-
         # Current equity includes floating P&L
         performance_data[-1]["Balance"] = round(
             account.equity,
@@ -548,14 +541,16 @@ def get_allocations():
     account = _account_info()
 
     balance = account.balance
-
     positions = mt5.positions_get()
 
-    if positions is None:
-        raise Exception(f"Positions error: {mt5.last_error()}")
+    if positions is None or not balance:
+      return [{
+          "name": "Cash",
+          "value": 100,
+      }]
 
-    # Group positions by symbol
     grouped = {}
+    total_exposure = 0.0
 
     for pos in positions:
         symbol = pos.symbol
@@ -568,51 +563,27 @@ def get_allocations():
             grouped[symbol] = {
                 "symbol": symbol,
                 "value": 0,
-                "volume": 0,
-                "profit": 0,
-                "margin": 0,
-                "positions_count": 0
             }
 
-        position_value = (
+        exposure = (
             pos.volume *
             symbol_info.trade_contract_size *
             pos.price_current
         )
 
-        order_type = (
-            mt5.ORDER_TYPE_BUY
-            if pos.type == mt5.POSITION_TYPE_BUY
-            else mt5.ORDER_TYPE_SELL
-        )
+        grouped[symbol] = grouped.get(symbol, 0.0) + exposure
+        total_exposure += exposure
 
-        margin = mt5.order_calc_margin(
-            order_type,
-            symbol,
-            pos.volume,
-            pos.price_current
-        )
-
-        grouped[symbol]["value"] += position_value
-        grouped[symbol]["volume"] += pos.volume
-        grouped[symbol]["profit"] += pos.profit
-        grouped[symbol]["margin"] += margin or 0
-        grouped[symbol]["positions_count"] += 1
-
-    allocation = []
-    total_exposure = 0
-
-    for symbol, item in grouped.items():
-        total_exposure += item["value"]
-
-        allocation.append({
+    allocation = [
+        {
             "name": symbol,
-            "value": round(
-                item["value"] / balance * 100 if balance else 0, 2
-            ),
-        })
+            "value": round(exposure / balance * 100, 2),
+        }
+        for symbol, exposure in grouped.items()
+    ]
 
-    # Cash as remaining nominal balance
+    cash = max(0.0, balance - total_exposure)
+
     cash = max(0, balance - total_exposure)
 
     allocation.append({
