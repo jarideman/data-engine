@@ -13,8 +13,6 @@ run `python main.py`
 - [ ] Validate incoming data
 - [ ] Detect missing, duplicate and out-of-order data
 - [ ] Track bid, ask, spread and volume
-- [ ] Manage symbols
-- [ ] Handle trading sessions and timezones
 
 ## Candle Engine
 - [ ] Build candles from ticks
