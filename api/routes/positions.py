@@ -26,4 +26,4 @@ def closed_positions():
 
 @router.get("/closed/{ticket}")
 def closed_position(ticket: int):
-    return get_closed_position(ticket=ticket)
+    return get_closed_position(position_id=ticket)
