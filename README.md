@@ -13,7 +13,7 @@ run `python main.py`
 - [ ] Validate incoming data
 - [ ] Detect missing, duplicate and out-of-order data
 - [ ] Track bid, ask, spread and volume
-- [ ] Manage instruments/symbols
+- [ ] Manage symbols
 - [ ] Handle trading sessions and timezones
 
 ## Candle Engine
@@ -27,27 +27,11 @@ run `python main.py`
 - [ ] Connect to postgresql db
 - [ ] Store raw tick data
 - [ ] Store historical candles
-- [ ] Store instrument information
-- [ ] Query historical data efficiently
-
-## Backtesting
-- [ ] Historical data replay
-- [ ] Live/backtest compatible interface
-- [ ] Configurable replay speed
-- [ ] Deterministic replay
-- [ ] Prevent look-ahead bias
+- [ ] Store symbol information
 
 ## API
 - [ ] Get latest market data
 - [ ] Get historical candles
-- [ ] Subscribe to market events
-- [ ] Get instrument information
+- [x] Get symbol information
 - [ ] Get data/feed status
-- [ ] Get open/historic positions
-
-## Monitoring
-- [ ] Track feed connection
-- [ ] Track data latency
-- [ ] Track data gaps
-- [ ] Track invalid data
-- [ ] Track processing errors
+- [x] Get open/closed positions
