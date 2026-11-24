@@ -285,17 +285,11 @@ def get_risk_details():
 
 
 def get_performance_data(time_filter="ALL"):
+    start_date = get_filter_start_date(time_filter).date()
+    end_date = get_now().date()
+
     account = _account_info()
-
-    start_date = get_filter_start_date(time_filter)
-
     deals = _get_historic_deals()
-
-    if deals is None:
-        raise Exception(
-            f"Unable to retrieve trading history: {mt5.last_error()}"
-        )
-
 
     daily_trading = defaultdict(float)
     daily_cash_movements = defaultdict(float)
@@ -305,63 +299,47 @@ def get_performance_data(time_filter="ALL"):
     total_historical_movements = 0.0
 
     for deal in deals:
+        deal_type = deal.type
+
+        if deal_type == mt5.DEAL_TYPE_BUY or deal_type == mt5.DEAL_TYPE_SELL:
+            movement = get_deal_net_profit(deal)
+            movement_type = "trading"
+
+        elif deal_type == mt5.DEAL_TYPE_BALANCE:
+            movement = deal.profit
+            movement_type = "cash"
+
+        else:
+            continue
+
         deal_date = datetime.fromtimestamp(
-            deal.time,
-            tz=timezone.utc
+            deal.time, tz=timezone.utc
         ).date()
 
-        if deal.type in (
-            mt5.DEAL_TYPE_BUY,
-            mt5.DEAL_TYPE_SELL
-        ):
-            net_profit = get_deal_net_profit(deal)
+        total_historical_movements += movement
 
-            total_historical_movements += net_profit
+        if movement_type == "trading":
+            daily_trading[deal_date] += movement
+        else:
+            daily_cash_movements[deal_date] += movement
 
-            daily_trading[deal_date] += net_profit
+        all_movements.append((
+            deal.time,
+            deal.ticket,
+            movement,
+            deal_date,
+            movement_type
+        ))
 
-            all_movements.append((
-                deal.time,
-                deal.ticket,
-                net_profit,
-                deal_date,
-                "trading"
-            ))
+    initial_balance = account.balance - total_historical_movements
 
-        elif deal.type == mt5.DEAL_TYPE_BALANCE:
-            amount = deal.profit
+    if not all_movements and initial_balance == 0:
+        return []
 
-            total_historical_movements += amount
-
-            daily_cash_movements[deal_date] += amount
-
-            all_movements.append((
-                deal.time,
-                deal.ticket,
-                amount,
-                deal_date,
-                "cash"
-            ))
-
-
-    initial_balance = (
-        account.balance - total_historical_movements
-    )
-
-    # Sort movements chronologically
-    all_movements.sort(
-        key=lambda item: (item[0], item[1])
-    )
+    all_movements.sort(key=lambda x: (x[0], x[1]))
 
     running_balance = initial_balance
-
     first_active_date = None
-
-    if initial_balance != 0 and all_movements:
-        first_active_date = datetime.fromtimestamp(
-            all_movements[0][0],
-            tz=timezone.utc
-        ).date()
 
     for timestamp, ticket, movement, deal_date, movement_type in all_movements:
         running_balance += movement
@@ -369,51 +347,45 @@ def get_performance_data(time_filter="ALL"):
         if running_balance != 0 and first_active_date is None:
             first_active_date = deal_date
 
+    if initial_balance != 0 and all_movements:
+        first_active_date = min(
+            first_active_date or all_movements[0][3],
+            all_movements[0][3]
+        )
+
     if first_active_date is None:
         return []
 
-
     effective_start_date = max(
-        start_date.date(),
+        start_date,
         first_active_date
     )
 
-    end_date = get_now().date()
-
     start_balance = initial_balance
+    cumulative_pnl = 0.0
 
     for timestamp, ticket, movement, deal_date, movement_type in all_movements:
-        if deal_date < effective_start_date:
-            start_balance += movement
+        if deal_date >= effective_start_date:
+            break
 
+        start_balance += movement
 
-    cumulative_pnl = sum(
-        movement
-        for timestamp, ticket, movement, deal_date, movement_type in all_movements
         if (
             deal_date >= first_active_date
-            and deal_date < effective_start_date
             and movement_type == "trading"
-        )
-    )
-
+        ):
+            cumulative_pnl += movement
 
     performance_data = []
 
     running_balance = start_balance
-
     current_date = effective_start_date
 
     while current_date <= end_date:
         trading_pnl = daily_trading.get(current_date, 0.0)
-
-        cash_movement = daily_cash_movements.get(
-            current_date, 0.0
-        )
+        cash_movement = daily_cash_movements.get(current_date, 0.0)
 
         running_balance += trading_pnl + cash_movement
-
-        # Lifetime P&L, not selected-period P&L
         cumulative_pnl += trading_pnl
 
         performance_data.append({
@@ -424,11 +396,7 @@ def get_performance_data(time_filter="ALL"):
 
         current_date += timedelta(days=1)
 
-
-    positions = mt5.positions_get()
-
-    if positions is None:
-        positions = []
+    positions = mt5.positions_get() or []
 
     floating_pnl = sum(
         position.profit + position.swap
@@ -436,16 +404,10 @@ def get_performance_data(time_filter="ALL"):
     )
 
     if performance_data:
-        # Current equity includes floating P&L
-        performance_data[-1]["Balance"] = round(
-            account.equity,
-            2
-        )
+        performance_data[-1]["Balance"] = round(account.equity, 2)
 
-        # Lifetime P&L + current floating P&L
         performance_data[-1]["P&L"] = round(
-            cumulative_pnl + floating_pnl,
-            2
+            cumulative_pnl + floating_pnl, 2
         )
 
     return performance_data
