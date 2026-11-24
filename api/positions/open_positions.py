@@ -1,5 +1,6 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timezone
+from shared.net_profit import get_deal_net_profit
 
 
 def _format_positions(positions):
@@ -17,6 +18,7 @@ def _format_positions(positions):
         date = open_time.strftime("%Y-%m-%d %H:%M:%S")
 
         result.append({
+            "ticket": position.ticket,
             "symbol": position.symbol,
             "status": 'open',
             "type": order_type,
@@ -25,7 +27,7 @@ def _format_positions(positions):
             'price_current': position.price_current,
             'stop_loss': position.sl,
             'take_profit': position.tp,
-            'profit': position.profit + position.swap + position.commission,
+            'profit': get_deal_net_profit(position),
             'date': date,
         })
 
@@ -36,3 +38,12 @@ def get_open_positions():
     open_positions = mt5.positions_get()
 
     return _format_positions(open_positions)
+
+
+def get_open_position(ticket: int):
+    positions = mt5.positions_get(ticket=ticket)
+
+    if positions is None or len(positions) == 0:
+        return None
+
+    return _format_positions(positions)[0]

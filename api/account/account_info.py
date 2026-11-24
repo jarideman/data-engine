@@ -1,20 +1,467 @@
 import MetaTrader5 as mt5
+from datetime import datetime, time, timezone, timedelta
+from collections import defaultdict
+from shared.date_filter import get_filter_start_date
+from shared.net_profit import get_deal_net_profit
+from shared.now import get_now
 
-def _format_account_info(account_info):
-    return {
-        'login': account_info.login,
-        'name': account_info.name,
-        'leverage': account_info.leverage,
-        'balance': account_info.balance,
-        'equity': account_info.equity,
-        'profit': account_info.profit,
-        'server': account_info.server,
-        'trade_allowed': account_info.trade_allowed,
-        'trade_expert': account_info.trade_expert,
-    }
+def _account_info():
+  account = mt5.account_info()
+
+  if account is None:
+    raise Exception(
+      f"Unable to retrieve account information: {mt5.last_error()}"
+    )
+
+  return account
+
+
+def _get_historic_deals(start = datetime(2000, 1, 1, tzinfo=timezone.utc)):
+    deals = mt5.history_deals_get(
+        start,
+        get_now()
+    )
+
+    if deals is None:
+        raise Exception(
+            f"Unable to retrieve trading history: {mt5.last_error()}"
+        )
+
+    return deals
 
 
 def get_account_info():
-    account_info = mt5.account_info()
+  account = _account_info()
 
-    return _format_account_info(account_info)
+  return {
+    'login': account.login,
+    'name': account.name,
+    'leverage': account.leverage,
+    'balance': account.balance,
+    'equity': account.equity,
+    'profit': account.profit,
+    'server': account.server,
+    'trade_allowed': account.trade_allowed,
+    'trade_expert': account.trade_expert,
+  }
+
+
+def get_portfolio_details():
+    account = _account_info()
+
+    deals = _get_historic_deals()
+
+    deposits = 0.0
+    withdrawals = 0.0
+
+    if deals:
+        for deal in deals:
+            if deal.type == mt5.DEAL_TYPE_BALANCE:
+                if deal.profit > 0:
+                    deposits += deal.profit
+                elif deal.profit < 0:
+                    withdrawals += abs(deal.profit)
+
+    net_deposits = deposits - withdrawals
+
+    balance = account.balance
+    equity = account.equity
+    floating_pnl = account.profit
+
+    realized_pnl = balance - net_deposits
+    total_pnl = realized_pnl + floating_pnl
+
+    total_return = (
+        (total_pnl / net_deposits) * 100
+        if net_deposits > 0
+        else 0.0
+    )
+
+    today_start = datetime.combine(
+        get_now().date(),
+        time.min,
+    )
+
+    today_deals = _get_historic_deals(start=today_start)
+
+    today_profit = sum(
+        get_deal_net_profit(deal)
+        for deal in today_deals
+        if deal.type in (mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL)
+    )
+
+    return [
+        {
+            "label": "Total Portfolio Value",
+            "value": round(equity, 2)
+        },
+        {
+            "label": "Total P&L",
+            "value": round(total_pnl, 2)
+        },
+        {
+            "label": "Total Return (%)",
+            "value": f"{total_return:.2f} %"
+        },
+        {
+            "label": "Floating P&L",
+            "value": round(floating_pnl, 2)
+        },
+        {
+            "label": "Today's P&L",
+            "value": round(today_profit, 2)
+        },
+        {
+            "label": "Cash Balance",
+            "value": round(balance, 2)
+        }
+    ]
+
+
+def get_risk_details():
+    account = _account_info()
+    deals = _get_historic_deals()
+
+    positions = mt5.positions_get() or []
+
+    open_position_ids = {
+        position.identifier for position in positions
+    }
+
+    trades = defaultdict(float)
+
+    all_movements = []
+
+    deposits = 0.0
+    withdrawals = 0.0
+    total_trading_profit = 0.0
+
+    for deal in deals:
+        deal_type = deal.type
+
+        if deal_type in (
+            mt5.DEAL_TYPE_BUY,
+            mt5.DEAL_TYPE_SELL
+        ):
+            position_id = deal.position_id
+
+            if position_id == 0:
+                continue
+
+            net_profit = get_deal_net_profit(deal)
+
+            trades[position_id] += net_profit
+            total_trading_profit += net_profit
+
+            all_movements.append(
+                (deal.time, deal.ticket, net_profit)
+            )
+
+        elif deal_type == mt5.DEAL_TYPE_BALANCE:
+            amount = deal.profit
+
+            if amount > 0:
+                deposits += amount
+            elif amount < 0:
+                withdrawals += abs(amount)
+
+            all_movements.append(
+                (deal.time, deal.ticket, amount)
+            )
+
+    total_trades = 0
+    total_wins = 0
+    total_losses = 0
+
+    gross_profit = 0.0
+    gross_loss = 0.0
+
+    for position_id, profit in trades.items():
+        if position_id in open_position_ids:
+            continue
+
+        if profit > 0:
+            total_wins += 1
+            gross_profit += profit
+
+        elif profit < 0:
+            total_losses += 1
+            gross_loss += abs(profit)
+
+        total_trades += 1
+
+    win_rate = (
+        total_wins / total_trades * 100
+        if total_trades else 0.0
+    )
+
+    profit_factor = (
+        gross_profit / gross_loss
+        if gross_loss > 0 else 0.0
+    )
+
+    average_win = (
+        gross_profit / total_wins
+        if total_wins else 0.0
+    )
+
+    average_loss = (
+        -gross_loss / total_losses
+        if total_losses else 0.0
+    )
+
+    net_deposits = deposits - withdrawals
+
+    initial_balance = (
+        account.balance
+        - net_deposits
+        - total_trading_profit
+    )
+
+    all_movements.sort(
+        key=lambda item: (item[0], item[1])
+    )
+
+    running_balance = initial_balance
+    peak_balance = initial_balance
+
+    maximum_drawdown = 0.0
+    maximum_drawdown_percent = 0.0
+
+    for timestamp, ticket, movement in all_movements:
+        running_balance += movement
+
+        peak_balance = max(peak_balance, running_balance)
+
+        drawdown = peak_balance - running_balance
+
+        drawdown_percent = (
+            drawdown / peak_balance * 100
+            if peak_balance > 0 else 0.0
+        )
+
+        if drawdown > maximum_drawdown:
+            maximum_drawdown = drawdown
+            maximum_drawdown_percent = drawdown_percent
+
+    current_equity = account.equity
+    current_drawdown = peak_balance - current_equity
+
+    current_drawdown_percent = (
+        current_drawdown / peak_balance * 100
+        if peak_balance > 0 else 0.0
+    )
+
+    if current_drawdown > maximum_drawdown:
+        maximum_drawdown = current_drawdown
+        maximum_drawdown_percent = current_drawdown_percent
+
+    return [
+        {
+            "label": "Maximum Drawdown",
+            "value": round(-maximum_drawdown, 2),
+        },
+        {
+            "label": "Maximum Drawdown (%)",
+            "value": f"{-maximum_drawdown_percent:.2f} %",
+        },
+        {
+            "label": "Win Rate",
+            "value": f"{win_rate:.2f} %",
+        },
+        {
+            "label": "Profit Factor",
+            "value": f"{profit_factor:.2f}",
+        },
+        {
+            "label": "Average Win",
+            "value": round(average_win, 2),
+        },
+        {
+            "label": "Average Loss",
+            "value": round(average_loss, 2),
+        },
+    ]
+
+
+def get_performance_data(time_filter="ALL"):
+    start_date = get_filter_start_date(time_filter).date()
+    end_date = get_now().date()
+
+    account = _account_info()
+    deals = _get_historic_deals()
+
+    daily_trading = defaultdict(float)
+    daily_cash_movements = defaultdict(float)
+
+    all_movements = []
+
+    total_historical_movements = 0.0
+
+    for deal in deals:
+        deal_type = deal.type
+
+        if deal_type == mt5.DEAL_TYPE_BUY or deal_type == mt5.DEAL_TYPE_SELL:
+            movement = get_deal_net_profit(deal)
+            movement_type = "trading"
+
+        elif deal_type == mt5.DEAL_TYPE_BALANCE:
+            movement = deal.profit
+            movement_type = "cash"
+
+        else:
+            continue
+
+        deal_date = datetime.fromtimestamp(
+            deal.time, tz=timezone.utc
+        ).date()
+
+        total_historical_movements += movement
+
+        if movement_type == "trading":
+            daily_trading[deal_date] += movement
+        else:
+            daily_cash_movements[deal_date] += movement
+
+        all_movements.append((
+            deal.time,
+            deal.ticket,
+            movement,
+            deal_date,
+            movement_type
+        ))
+
+    initial_balance = account.balance - total_historical_movements
+
+    if not all_movements and initial_balance == 0:
+        return []
+
+    all_movements.sort(key=lambda x: (x[0], x[1]))
+
+    running_balance = initial_balance
+    first_active_date = None
+
+    for timestamp, ticket, movement, deal_date, movement_type in all_movements:
+        running_balance += movement
+
+        if running_balance != 0 and first_active_date is None:
+            first_active_date = deal_date
+
+    if initial_balance != 0 and all_movements:
+        first_active_date = min(
+            first_active_date or all_movements[0][3],
+            all_movements[0][3]
+        )
+
+    if first_active_date is None:
+        return []
+
+    effective_start_date = max(
+        start_date,
+        first_active_date
+    )
+
+    start_balance = initial_balance
+    cumulative_pnl = 0.0
+
+    for timestamp, ticket, movement, deal_date, movement_type in all_movements:
+        if deal_date >= effective_start_date:
+            break
+
+        start_balance += movement
+
+        if (
+            deal_date >= first_active_date
+            and movement_type == "trading"
+        ):
+            cumulative_pnl += movement
+
+    performance_data = []
+
+    running_balance = start_balance
+    current_date = effective_start_date
+
+    while current_date <= end_date:
+        trading_pnl = daily_trading.get(current_date, 0.0)
+        cash_movement = daily_cash_movements.get(current_date, 0.0)
+
+        running_balance += trading_pnl + cash_movement
+        cumulative_pnl += trading_pnl
+
+        performance_data.append({
+            "date": current_date.strftime("%b %d"),
+            "Balance": round(running_balance, 2),
+            "P&L": round(cumulative_pnl, 2),
+        })
+
+        current_date += timedelta(days=1)
+
+    positions = mt5.positions_get() or []
+
+    floating_pnl = sum(
+        position.profit + position.swap
+        for position in positions
+    )
+
+    if performance_data:
+        performance_data[-1]["Balance"] = round(account.equity, 2)
+
+        performance_data[-1]["P&L"] = round(
+            cumulative_pnl + floating_pnl, 2
+        )
+
+    return performance_data
+
+
+def get_allocations():
+    account = _account_info()
+
+    balance = account.balance
+    positions = mt5.positions_get()
+
+    if positions is None or not balance:
+      return [{
+          "name": "Cash",
+          "value": 100,
+      }]
+
+    grouped = {}
+    symbol_cache = {}
+    total_exposure = 0.0
+
+    for pos in positions:
+        symbol = pos.symbol
+
+        if symbol not in symbol_cache:
+            symbol_cache[symbol] = mt5.symbol_info(symbol)
+
+        symbol_info = symbol_cache[symbol]
+
+        if symbol_info is None:
+            continue
+
+        exposure = (
+            pos.volume
+            * symbol_info.trade_contract_size
+            * pos.price_current
+        )
+
+        grouped[symbol] = grouped.get(symbol, 0.0) + exposure
+        total_exposure += exposure
+
+    allocation = [
+        {
+            "name": symbol,
+            "value": round(exposure / balance * 100, 2),
+        }
+        for symbol, exposure in grouped.items()
+    ]
+
+    cash = max(0.0, balance - total_exposure)
+
+    allocation.append({
+        "name": "Cash",
+        "value": round(cash / balance * 100, 2),
+    })
+
+    return allocation

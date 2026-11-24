@@ -24,11 +24,11 @@ run `python main.py`
 - [ ] Keep live and backtest candle generation identical
 
 ## Storage
+- [ ] Connect to postgresql db
 - [ ] Store raw tick data
 - [ ] Store historical candles
 - [ ] Store instrument information
 - [ ] Query historical data efficiently
-- [ ] Cache recent/current market data
 
 ## Backtesting
 - [ ] Historical data replay

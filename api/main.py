@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from routes import router
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from connection import init_mt5, deinit_mt5
+from routes import account, positions, symbols
 
 
 @asynccontextmanager
@@ -29,4 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+app.include_router(account.router, prefix="/api")
+app.include_router(positions.router, prefix="/api")
+app.include_router(symbols.router, prefix="/api")
