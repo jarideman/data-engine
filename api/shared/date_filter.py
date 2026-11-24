@@ -1,9 +1,10 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timedelta, timezone
+from shared.now import get_now
 
 
 def get_filter_start_date(time_filter):
-  now = datetime.now(timezone.utc)
+  now = get_now()
 
   filters = {
     "1D": now - timedelta(days=1),

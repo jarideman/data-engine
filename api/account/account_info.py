@@ -3,7 +3,7 @@ from datetime import datetime, time, timezone, timedelta
 from collections import defaultdict
 from shared.date_filter import get_filter_start_date
 from shared.net_profit import get_deal_net_profit
-
+from shared.now import get_now
 
 def _account_info():
   account = mt5.account_info()
@@ -19,7 +19,7 @@ def _account_info():
 def _get_historic_deals(start = datetime(2000, 1, 1, tzinfo=timezone.utc)):
     deals = mt5.history_deals_get(
         start,
-        datetime.now(timezone.utc)
+        get_now()
     )
 
     if deals is None:
@@ -78,9 +78,8 @@ def get_portfolio_details():
     )
 
     today_start = datetime.combine(
-        datetime.now(timezone.utc).date(),
+        get_now().date(),
         time.min,
-        tzinfo=timezone.utc
     )
 
     today_deals = _get_historic_deals(start=today_start)
@@ -121,14 +120,9 @@ def get_portfolio_details():
 
 def get_risk_details():
     account = _account_info()
-
     deals = _get_historic_deals()
 
-    positions = mt5.positions_get()
-
-    if positions is None:
-        positions = []
-
+    positions = mt5.positions_get() or []
 
     open_position_ids = {
         position.identifier for position in positions
@@ -136,111 +130,93 @@ def get_risk_details():
 
     trades = defaultdict(float)
 
-    trading_deals = []
-
-    for deal in deals:
-        if deal.type not in (
-            mt5.DEAL_TYPE_BUY,
-            mt5.DEAL_TYPE_SELL
-        ):
-            continue
-
-        position_id = deal.position_id
-
-        if position_id == 0:
-            continue
-
-        net_profit = get_deal_net_profit(deal)
-
-        trades[position_id] += net_profit
-        trading_deals.append((deal, net_profit))
-
-    closed_trades = [
-        profit
-        for position_id, profit in trades.items()
-        if position_id not in open_position_ids
-    ]
-
-    winning_trades = [
-        profit for profit in closed_trades
-        if profit > 0
-    ]
-
-    losing_trades = [
-        profit for profit in closed_trades
-        if profit < 0
-    ]
-
-    total_trades = len(closed_trades)
-    total_wins = len(winning_trades)
-    total_losses = len(losing_trades)
-
-    win_rate = (
-        (total_wins / total_trades) * 100
-        if total_trades > 0
-        else 0.0
-    )
-
-    gross_profit = sum(winning_trades)
-    gross_loss = abs(sum(losing_trades))
-
-    profit_factor = (
-        gross_profit / gross_loss
-        if gross_loss > 0
-        else 0.0
-    )
-
-    average_win = (
-        gross_profit / total_wins
-        if total_wins > 0
-        else 0.0
-    )
-
-    average_loss = (
-        sum(losing_trades) / total_losses
-        if total_losses > 0
-        else 0.0
-    )
+    all_movements = []
 
     deposits = 0.0
     withdrawals = 0.0
-
-    cash_movements = []
+    total_trading_profit = 0.0
 
     for deal in deals:
-        if deal.type == mt5.DEAL_TYPE_BALANCE:
+        deal_type = deal.type
+
+        if deal_type in (
+            mt5.DEAL_TYPE_BUY,
+            mt5.DEAL_TYPE_SELL
+        ):
+            position_id = deal.position_id
+
+            if position_id == 0:
+                continue
+
+            net_profit = get_deal_net_profit(deal)
+
+            trades[position_id] += net_profit
+            total_trading_profit += net_profit
+
+            all_movements.append(
+                (deal.time, deal.ticket, net_profit)
+            )
+
+        elif deal_type == mt5.DEAL_TYPE_BALANCE:
             amount = deal.profit
 
             if amount > 0:
                 deposits += amount
-
             elif amount < 0:
                 withdrawals += abs(amount)
 
-            cash_movements.append(
+            all_movements.append(
                 (deal.time, deal.ticket, amount)
             )
 
-    net_deposits = deposits - withdrawals
+    total_trades = 0
+    total_wins = 0
+    total_losses = 0
 
-    total_trading_profit = sum(
-        net_profit for deal, net_profit in trading_deals
+    gross_profit = 0.0
+    gross_loss = 0.0
+
+    for position_id, profit in trades.items():
+        if position_id in open_position_ids:
+            continue
+
+        if profit > 0:
+            total_wins += 1
+            gross_profit += profit
+
+        elif profit < 0:
+            total_losses += 1
+            gross_loss += abs(profit)
+
+        total_trades += 1
+
+    win_rate = (
+        total_wins / total_trades * 100
+        if total_trades else 0.0
     )
+
+    profit_factor = (
+        gross_profit / gross_loss
+        if gross_loss > 0 else 0.0
+    )
+
+    average_win = (
+        gross_profit / total_wins
+        if total_wins else 0.0
+    )
+
+    average_loss = (
+        -gross_loss / total_losses
+        if total_losses else 0.0
+    )
+
+    net_deposits = deposits - withdrawals
 
     initial_balance = (
         account.balance
         - net_deposits
         - total_trading_profit
     )
-
-    all_movements = []
-
-    for deal, net_profit in trading_deals:
-        all_movements.append(
-            (deal.time, deal.ticket, net_profit)
-        )
-
-    all_movements.extend(cash_movements)
 
     all_movements.sort(
         key=lambda item: (item[0], item[1])
@@ -255,15 +231,13 @@ def get_risk_details():
     for timestamp, ticket, movement in all_movements:
         running_balance += movement
 
-        if running_balance > peak_balance:
-            peak_balance = running_balance
+        peak_balance = max(peak_balance, running_balance)
 
         drawdown = peak_balance - running_balance
 
         drawdown_percent = (
-            (drawdown / peak_balance) * 100
-            if peak_balance > 0
-            else 0.0
+            drawdown / peak_balance * 100
+            if peak_balance > 0 else 0.0
         )
 
         if drawdown > maximum_drawdown:
@@ -271,13 +245,11 @@ def get_risk_details():
             maximum_drawdown_percent = drawdown_percent
 
     current_equity = account.equity
-
     current_drawdown = peak_balance - current_equity
 
     current_drawdown_percent = (
-        (current_drawdown / peak_balance) * 100
-        if peak_balance > 0
-        else 0.0
+        current_drawdown / peak_balance * 100
+        if peak_balance > 0 else 0.0
     )
 
     if current_drawdown > maximum_drawdown:
@@ -291,24 +263,24 @@ def get_risk_details():
         },
         {
             "label": "Maximum Drawdown (%)",
-            "value": f"{-maximum_drawdown_percent:.2f} %"
+            "value": f"{-maximum_drawdown_percent:.2f} %",
         },
         {
             "label": "Win Rate",
-            "value": f"{win_rate:.2f} %"
+            "value": f"{win_rate:.2f} %",
         },
         {
             "label": "Profit Factor",
-            "value": f"{profit_factor:.2f}"
+            "value": f"{profit_factor:.2f}",
         },
         {
             "label": "Average Win",
-            "value": round(average_win, 2)
+            "value": round(average_win, 2),
         },
         {
             "label": "Average Loss",
-            "value": round(average_loss, 2)
-        }
+            "value": round(average_loss, 2),
+        },
     ]
 
 
@@ -406,7 +378,7 @@ def get_performance_data(time_filter="ALL"):
         first_active_date
     )
 
-    end_date = datetime.now(timezone.utc).date()
+    end_date = get_now().date()
 
     start_balance = initial_balance
 

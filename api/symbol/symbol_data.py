@@ -1,6 +1,7 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timezone
 from shared.date_filter import get_filter_start_date, get_timeframe
+from shared.now import get_now
 
 
 def get_symbol_data(symbol: str, time_filter="ALL"):
@@ -12,7 +13,7 @@ def get_symbol_data(symbol: str, time_filter="ALL"):
   if symbol_info is None:
     raise Exception(f"Symbol {symbol} not found")
 
-  now = datetime.now(timezone.utc)
+  now = get_now()
 
   rates = mt5.copy_rates_range(
     symbol,
