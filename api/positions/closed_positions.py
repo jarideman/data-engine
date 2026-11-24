@@ -1,6 +1,8 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timezone
 from collections import defaultdict
+from shared.net_profit import get_deal_net_profit
+
 
 # Check/refactor this code
 def _format_positions(deals):
@@ -62,7 +64,7 @@ def _format_positions(deals):
                 "volume": deal.volume,
                 "price_open": price_open,
                 "price_exit": deal.price,
-                "profit": deal.profit + deal.swap + deal.commission,
+                "profit": get_deal_net_profit(deal),
                 "date": close_time.strftime("%Y-%m-%d %H:%M:%S"),
             })
 

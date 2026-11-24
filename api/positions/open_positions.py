@@ -1,5 +1,6 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timezone
+from shared.net_profit import get_deal_net_profit
 
 
 def _format_positions(positions):
@@ -26,7 +27,7 @@ def _format_positions(positions):
             'price_current': position.price_current,
             'stop_loss': position.sl,
             'take_profit': position.tp,
-            'profit': position.profit + position.swap,
+            'profit': get_deal_net_profit(position),
             'date': date,
         })
 

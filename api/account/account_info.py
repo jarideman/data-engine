@@ -2,6 +2,7 @@ import MetaTrader5 as mt5
 from datetime import datetime, time, timezone, timedelta
 from collections import defaultdict
 from shared.date_filter import get_filter_start_date
+from shared.net_profit import get_deal_net_profit
 
 
 def _account_info():
@@ -13,6 +14,20 @@ def _account_info():
     )
 
   return account
+
+
+def _get_historic_deals(start = datetime(2000, 1, 1, tzinfo=timezone.utc)):
+    deals = mt5.history_deals_get(
+        start,
+        datetime.now(timezone.utc)
+    )
+
+    if deals is None:
+        raise Exception(
+            f"Unable to retrieve trading history: {mt5.last_error()}"
+        )
+
+    return deals
 
 
 def get_account_info():
@@ -34,10 +49,7 @@ def get_account_info():
 def get_portfolio_details():
     account = _account_info()
 
-    deals = mt5.history_deals_get(
-        datetime(2000, 1, 1, tzinfo=timezone.utc),
-        datetime.now(timezone.utc)
-    )
+    deals = _get_historic_deals()
 
     deposits = 0.0
     withdrawals = 0.0
@@ -56,13 +68,9 @@ def get_portfolio_details():
     equity = account.equity
     floating_pnl = account.profit
 
-    # Realized P&L = balance minus net deposits
     realized_pnl = balance - net_deposits
-
-    # Total P&L = realized P&L + floating P&L
     total_pnl = realized_pnl + floating_pnl
 
-    # Total return percentage
     total_return = (
         (total_pnl / net_deposits) * 100
         if net_deposits > 0
@@ -75,25 +83,13 @@ def get_portfolio_details():
         tzinfo=timezone.utc
     )
 
-    today_deals = mt5.history_deals_get(
-        today_start,
-        datetime.now(timezone.utc)
+    today_deals = _get_historic_deals(start=today_start)
+
+    today_profit = sum(
+        get_deal_net_profit(deal)
+        for deal in today_deals
+        if deal.type in (mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL)
     )
-
-    today_profit = 0.0
-
-    if today_deals:
-        for deal in today_deals:
-            if deal.type in (
-                mt5.DEAL_TYPE_BUY,
-                mt5.DEAL_TYPE_SELL
-            ):
-                today_profit += (
-                    deal.profit
-                    + deal.swap
-                    + deal.commission
-                    + deal.fee
-                )
 
     return [
         {
@@ -126,26 +122,13 @@ def get_portfolio_details():
 def get_risk_details():
     account = _account_info()
 
-    deals = mt5.history_deals_get(
-        datetime(2000, 1, 1, tzinfo=timezone.utc),
-        datetime.now(timezone.utc)
-    )
-
-    if deals is None:
-        raise Exception(
-            f"Unable to retrieve trading history: {mt5.last_error()}"
-        )
+    deals = _get_historic_deals()
 
     positions = mt5.positions_get()
 
     if positions is None:
         positions = []
 
-    # Calculate floating PnL from open positions
-    floating_pnl = sum(
-        position.profit + position.swap
-        for position in positions
-    )
 
     open_position_ids = {
         position.identifier for position in positions
@@ -153,18 +136,9 @@ def get_risk_details():
 
     trades = defaultdict(float)
 
-    def get_deal_net_profit(deal):
-        return (
-            deal.profit
-            + deal.swap
-            + deal.commission
-            + getattr(deal, "fee", 0.0)
-        )
-
     trading_deals = []
 
     for deal in deals:
-
         if deal.type not in (
             mt5.DEAL_TYPE_BUY,
             mt5.DEAL_TYPE_SELL
@@ -181,7 +155,6 @@ def get_risk_details():
         trades[position_id] += net_profit
         trading_deals.append((deal, net_profit))
 
-    # Only include positions that have been fully closed
     closed_trades = [
         profit
         for position_id, profit in trades.items()
@@ -202,14 +175,12 @@ def get_risk_details():
     total_wins = len(winning_trades)
     total_losses = len(losing_trades)
 
-    # Win Rate
     win_rate = (
         (total_wins / total_trades) * 100
         if total_trades > 0
         else 0.0
     )
 
-    # Profit Factor
     gross_profit = sum(winning_trades)
     gross_loss = abs(sum(losing_trades))
 
@@ -219,30 +190,25 @@ def get_risk_details():
         else 0.0
     )
 
-    # Average Win
     average_win = (
         gross_profit / total_wins
         if total_wins > 0
         else 0.0
     )
 
-    # Average Loss (negative value)
     average_loss = (
         sum(losing_trades) / total_losses
         if total_losses > 0
         else 0.0
     )
 
-    # Calculate historical deposits and withdrawals
     deposits = 0.0
     withdrawals = 0.0
 
     cash_movements = []
 
     for deal in deals:
-
         if deal.type == mt5.DEAL_TYPE_BALANCE:
-
             amount = deal.profit
 
             if amount > 0:
@@ -257,19 +223,16 @@ def get_risk_details():
 
     net_deposits = deposits - withdrawals
 
-    # Calculate total historical trading result
     total_trading_profit = sum(
         net_profit for deal, net_profit in trading_deals
     )
 
-    # Reconstruct original balance
     initial_balance = (
         account.balance
         - net_deposits
         - total_trading_profit
     )
 
-    # Combine trading deals and cash movements
     all_movements = []
 
     for deal, net_profit in trading_deals:
@@ -279,12 +242,10 @@ def get_risk_details():
 
     all_movements.extend(cash_movements)
 
-    # Sort chronologically
     all_movements.sort(
         key=lambda item: (item[0], item[1])
     )
 
-    # Calculate historical drawdown
     running_balance = initial_balance
     peak_balance = initial_balance
 
@@ -292,14 +253,11 @@ def get_risk_details():
     maximum_drawdown_percent = 0.0
 
     for timestamp, ticket, movement in all_movements:
-
         running_balance += movement
 
-        # Update peak
         if running_balance > peak_balance:
             peak_balance = running_balance
 
-        # Calculate drawdown
         drawdown = peak_balance - running_balance
 
         drawdown_percent = (
@@ -312,9 +270,6 @@ def get_risk_details():
             maximum_drawdown = drawdown
             maximum_drawdown_percent = drawdown_percent
 
-
-    # MT5 equity includes floating PnL and other
-    # account-level adjustments.
     current_equity = account.equity
 
     current_drawdown = peak_balance - current_equity
@@ -357,25 +312,12 @@ def get_risk_details():
     ]
 
 
-# deze naar shared??
-def _get_deal_net_profit(deal):
-  return (
-    deal.profit
-    + deal.swap
-    + deal.commission
-    + getattr(deal, "fee", 0.0)
-  )
-
 def get_performance_data(time_filter="ALL"):
     account = _account_info()
 
-    now = datetime.now(timezone.utc)
     start_date = get_filter_start_date(time_filter)
 
-    deals = mt5.history_deals_get(
-        datetime(2000, 1, 1, tzinfo=timezone.utc),
-        now
-    )
+    deals = _get_historic_deals()
 
     if deals is None:
         raise Exception(
@@ -400,7 +342,7 @@ def get_performance_data(time_filter="ALL"):
             mt5.DEAL_TYPE_BUY,
             mt5.DEAL_TYPE_SELL
         ):
-            net_profit = _get_deal_net_profit(deal)
+            net_profit = get_deal_net_profit(deal)
 
             total_historical_movements += net_profit
 
@@ -464,7 +406,7 @@ def get_performance_data(time_filter="ALL"):
         first_active_date
     )
 
-    end_date = now.date()
+    end_date = datetime.now(timezone.utc).date()
 
     start_balance = initial_balance
 
@@ -550,25 +492,24 @@ def get_allocations():
       }]
 
     grouped = {}
+    symbol_cache = {}
     total_exposure = 0.0
 
     for pos in positions:
         symbol = pos.symbol
-        symbol_info = mt5.symbol_info(symbol)
+
+        if symbol not in symbol_cache:
+            symbol_cache[symbol] = mt5.symbol_info(symbol)
+
+        symbol_info = symbol_cache[symbol]
 
         if symbol_info is None:
             continue
 
-        if symbol not in grouped:
-            grouped[symbol] = {
-                "symbol": symbol,
-                "value": 0,
-            }
-
         exposure = (
-            pos.volume *
-            symbol_info.trade_contract_size *
-            pos.price_current
+            pos.volume
+            * symbol_info.trade_contract_size
+            * pos.price_current
         )
 
         grouped[symbol] = grouped.get(symbol, 0.0) + exposure
@@ -584,13 +525,9 @@ def get_allocations():
 
     cash = max(0.0, balance - total_exposure)
 
-    cash = max(0, balance - total_exposure)
-
     allocation.append({
         "name": "Cash",
-        "value": round(
-            cash / balance * 100 if balance else 0, 2
-        ),
+        "value": round(cash / balance * 100, 2),
     })
 
     return allocation
