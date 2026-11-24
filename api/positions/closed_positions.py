@@ -1,47 +1,40 @@
 import MetaTrader5 as mt5
 from datetime import datetime, timezone
-from collections import defaultdict
 from shared.net_profit import get_deal_net_profit
 from shared.now import get_now
 
 
 def _format_positions(deals):
-    result = []
-
     if not deals:
-        return result
+        return []
 
-    positions = defaultdict(list)
+    positions = {}
 
     for deal in deals:
-        positions[deal.position_id].append(deal)
+        position = positions.setdefault(deal.position_id, [0.0, 0.0, []])
 
-    for position_id, position_deals in positions.items():
-        opening_deals = [
-            d for d in position_deals
-            if d.entry == mt5.DEAL_ENTRY_IN
-        ]
+        if deal.entry == mt5.DEAL_ENTRY_IN:
+            position[0] += deal.price * deal.volume
+            position[1] += deal.volume
+        elif deal.entry in (
+            mt5.DEAL_ENTRY_OUT,
+            mt5.DEAL_ENTRY_OUT_BY,
+            mt5.DEAL_ENTRY_INOUT,
+        ):
+            position[2].append(deal)
 
-        closing_deals = [
-            d for d in position_deals
-            if d.entry in (
-                mt5.DEAL_ENTRY_OUT,
-                mt5.DEAL_ENTRY_OUT_BY,
-                mt5.DEAL_ENTRY_INOUT
-            )
-        ]
+    result = []
 
+    for position_id, position in positions.items():
+        weighted_open_price, total_open_volume, closing_deals = position
         if not closing_deals:
             continue
 
-        total_open_volume = sum(d.volume for d in opening_deals)
-
-        if total_open_volume:
-            price_open = sum(
-                d.price * d.volume for d in opening_deals
-            ) / total_open_volume
-        else:
-            price_open = None
+        price_open = (
+            weighted_open_price / total_open_volume
+            if total_open_volume
+            else None
+        )
 
         for deal in closing_deals:
             order_type = (
