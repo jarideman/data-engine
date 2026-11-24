@@ -5,7 +5,6 @@ from shared.net_profit import get_deal_net_profit
 from shared.now import get_now
 
 
-# Check/refactor this code
 def _format_positions(deals):
     result = []
 
@@ -73,12 +72,9 @@ def _format_positions(deals):
 
 
 def get_closed_positions():
-    now = get_now()
-
     from_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    to_date = datetime.fromtimestamp(now, tz=timezone.utc)
+    to_date = get_now()
 
-    # TODO: Ombouwen naar positions
     history_deals = mt5.history_deals_get(from_date, to_date)
 
     if history_deals is None:
@@ -88,7 +84,6 @@ def get_closed_positions():
 
 
 def get_closed_position(ticket: int):
-    # TODO: Ombouwen naar positions
     deals = mt5.history_deals_get(ticket=ticket)
 
     if deals is None or len(deals) == 0:
