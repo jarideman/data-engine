@@ -32,7 +32,7 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Fill in the required variables in `.env`.
+Fill/update the variables in `.env`.
 
 ### 5. Run the application
 ```bash
