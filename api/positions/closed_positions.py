@@ -51,7 +51,7 @@ def _format_positions(deals):
             result.append({
                 "ticket": deal.ticket,
                 "symbol": deal.symbol,
-                "position_id": position_id,
+                "position": position_id,
                 "status": "closed",
                 "type": order_type,
                 "volume": deal.volume,
@@ -76,8 +76,8 @@ def get_closed_positions():
     return _format_positions(history_deals)
 
 
-def get_closed_position(position_id: int):
-    deals = mt5.history_deals_get(position=position_id)
+def get_closed_position(position: int):
+    deals = mt5.history_deals_get(position=position)
 
     if deals is None or len(deals) == 0:
         return None

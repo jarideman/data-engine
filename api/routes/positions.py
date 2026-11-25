@@ -24,6 +24,6 @@ def closed_positions():
     return get_closed_positions()
 
 
-@router.get("/closed/{ticket}")
-def closed_position(ticket: int):
-    return get_closed_position(position_id=ticket)
+@router.get("/closed/{position}")
+def closed_position(position: int):
+    return get_closed_position(position=position)
