@@ -1,12 +1,10 @@
-from connection import init_mt5, deinit_mt5
-import subprocess
-import sys
+from connection import init_mt5
 from pathlib import Path
 from dotenv import load_dotenv
-import os
+from database import start_connection
+
 
 BASE_DIR = Path(__file__).resolve().parent
-
 API_DIR = BASE_DIR / "api"
 
 
@@ -15,6 +13,8 @@ def main():
         return
 
     load_dotenv()
+
+    start_connection()
 
 
 if __name__ == "__main__":
