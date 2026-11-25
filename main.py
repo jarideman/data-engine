@@ -16,32 +16,6 @@ def main():
 
     load_dotenv()
 
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "main:app",
-            "--app-dir",
-            str(API_DIR),
-            "--host",
-            os.getenv("HOST"),
-            "--port",
-            os.getenv("PORT"),
-        ],
-        cwd=API_DIR,
-    )
-
-
-    try:
-        process.wait()
-    except KeyboardInterrupt:
-        process.terminate()
-        process.wait()
-
-    finally:
-        deinit_mt5()
-
 
 if __name__ == "__main__":
     main()

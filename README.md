@@ -34,9 +34,14 @@ cp .env.example .env
 
 Fill/update the variables in `.env`.
 
-### 5. Run the application
+### 5. Start the data engine
 ```bash
 python main.py
+```
+
+### 6. Start the API
+```bash
+python -m uvicorn main:app --app-dir api --host 127.0.0.1 --port 8000
 ```
 
 
