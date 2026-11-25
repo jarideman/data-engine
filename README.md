@@ -62,7 +62,7 @@ python -m uvicorn main:app --app-dir api --host 127.0.0.1 --port 8000
 - [ ] Keep live and backtest candle generation identical
 
 ## Storage
-- [ ] Connect to postgresql db
+- [x] Connect to PostgreSQL db
 - [ ] Store raw tick data
 - [ ] Store historical candles
 - [ ] Store symbol information
